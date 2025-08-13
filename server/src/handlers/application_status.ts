@@ -1,50 +1,123 @@
-import { type UpdateApplicationStatusInput, type Application, type ApplicationStatusHistory } from '../schema';
+import { db } from '../db';
+import { applicationsTable, applicationStatusHistoryTable } from '../db/schema';
+import { type UpdateApplicationStatusInput, type Application, type ApplicationStatusHistory, type ApplicationStatus, applicationStatusSchema } from '../schema';
+import { eq, inArray } from 'drizzle-orm';
 
 export const updateApplicationStatus = async (input: UpdateApplicationStatusInput, changedByUserId: number): Promise<Application> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to update an application's status and create
-    // a history record of the status change for audit purposes.
-    return Promise.resolve({
-        id: input.application_id,
-        applicant_id: 0,
-        application_number: `APP-${Date.now()}`,
+  try {
+    // Get the current application to track the previous status
+    const currentApplication = await db
+      .select()
+      .from(applicationsTable)
+      .where(eq(applicationsTable.id, input.application_id))
+      .execute();
+
+    if (currentApplication.length === 0) {
+      throw new Error(`Application with ID ${input.application_id} not found`);
+    }
+
+    const previousStatus = currentApplication[0].status;
+
+    // Update the application status
+    const updatedApplications = await db
+      .update(applicationsTable)
+      .set({ 
         status: input.new_status,
-        submitted_at: new Date(),
-        created_at: new Date(),
         updated_at: new Date()
-    } as Application);
+      })
+      .where(eq(applicationsTable.id, input.application_id))
+      .returning()
+      .execute();
+
+    // Create status history record
+    await db
+      .insert(applicationStatusHistoryTable)
+      .values({
+        application_id: input.application_id,
+        previous_status: previousStatus,
+        new_status: input.new_status,
+        changed_by_user_id: changedByUserId,
+        notes: input.notes || null
+      })
+      .execute();
+
+    return updatedApplications[0];
+  } catch (error) {
+    console.error('Application status update failed:', error);
+    throw error;
+  }
 };
 
 export const getApplicationStatusHistory = async (applicationId: number): Promise<ApplicationStatusHistory[]> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch the complete status change history
-    // for a specific application, showing who made changes and when.
-    return Promise.resolve([
-        {
-            id: 0,
-            application_id: applicationId,
-            previous_status: null,
-            new_status: 'INITIAL_REGISTRATION',
-            changed_by_user_id: 0,
-            notes: 'Application created',
-            created_at: new Date()
-        } as ApplicationStatusHistory
-    ]);
+  try {
+    const history = await db
+      .select()
+      .from(applicationStatusHistoryTable)
+      .where(eq(applicationStatusHistoryTable.application_id, applicationId))
+      .orderBy(applicationStatusHistoryTable.created_at)
+      .execute();
+
+    return history;
+  } catch (error) {
+    console.error('Failed to fetch application status history:', error);
+    throw error;
+  }
 };
 
-export const bulkUpdateApplicationStatus = async (applicationIds: number[], newStatus: string, changedByUserId: number, notes?: string): Promise<Application[]> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to update the status of multiple applications
-    // at once, useful for batch processing in the admin dashboard.
-    return Promise.resolve(
-        applicationIds.map(id => ({
-            id,
-            applicant_id: 0,
-            application_number: `APP-${Date.now()}-${id}`,
-            status: newStatus as any,
-            submitted_at: new Date(),
-            created_at: new Date(),
-            updated_at: new Date()
-        } as Application))
-    );
+export const bulkUpdateApplicationStatus = async (
+  applicationIds: number[], 
+  newStatus: ApplicationStatus | string, 
+  changedByUserId: number, 
+  notes?: string
+): Promise<Application[]> => {
+  try {
+    // Handle empty array case
+    if (applicationIds.length === 0) {
+      return [];
+    }
+
+    // Validate and cast status to proper type
+    const validatedStatus = applicationStatusSchema.parse(newStatus);
+
+    // Get current applications to track previous statuses
+    const currentApplications = await db
+      .select()
+      .from(applicationsTable)
+      .where(inArray(applicationsTable.id, applicationIds))
+      .execute();
+
+    if (currentApplications.length !== applicationIds.length) {
+      throw new Error(`Some applications were not found. Expected ${applicationIds.length}, found ${currentApplications.length}`);
+    }
+
+    // Update all applications
+    const updatedApplications = await db
+      .update(applicationsTable)
+      .set({ 
+        status: validatedStatus,
+        updated_at: new Date()
+      })
+      .where(inArray(applicationsTable.id, applicationIds))
+      .returning()
+      .execute();
+
+    // Create status history records for each application
+    const historyRecords = currentApplications.map(app => ({
+      application_id: app.id,
+      previous_status: app.status,
+      new_status: validatedStatus,
+      changed_by_user_id: changedByUserId,
+      notes: notes || null
+    }));
+
+    await db
+      .insert(applicationStatusHistoryTable)
+      .values(historyRecords)
+      .execute();
+
+    return updatedApplications;
+  } catch (error) {
+    console.error('Bulk application status update failed:', error);
+    throw error;
+  }
 };

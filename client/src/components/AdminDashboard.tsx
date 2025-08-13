@@ -1,275 +1,210 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
 import { 
-  UsersIcon, 
-  CrownIcon, 
-  ClipboardIcon, 
-  RefreshCwIcon,
-  AlertCircleIcon,
-  CalendarIcon,
-  MailIcon
+  Users, 
+  FileText, 
+  TrendingUp,
+  Download,
+  Settings,
+  Search,
+  Filter,
+  BarChart3,
+  UserCheck,
+  Clock
 } from 'lucide-react';
+
+import AdminStats from './AdminStats';
+import ApplicationsManager from './ApplicationsManager';
+import DocumentViewer from './DocumentViewer';
+import ReportsManager from './ReportsManager';
+import AdminUserManager from './AdminUserManager';
+
 import { trpc } from '@/utils/trpc';
-// Type-only imports
-import type { PublicUser } from '../../../server/src/schema';
+import type { User as UserType } from '../../../server/src/schema';
 
 interface AdminDashboardProps {
-  currentUser: PublicUser;
+  user: UserType;
 }
 
-export function AdminDashboard({ currentUser }: AdminDashboardProps) {
-  const [users, setUsers] = useState<PublicUser[]>([]);
+export default function AdminDashboard({ user }: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const loadUsers = useCallback(async () => {
+  // Load dashboard stats
+  const loadDashboardStats = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await trpc.getAllUsers.query();
-      setUsers(result);
-      setLastUpdated(new Date());
+      const stats = await trpc.getAdminDashboardStats.query();
+      setDashboardStats(stats);
     } catch (error) {
-      console.error('Failed to load users:', error);
+      console.error('Failed to load dashboard stats:', error);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
+    loadDashboardStats();
+  }, [loadDashboardStats]);
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const adminCount = users.filter((user: PublicUser) => user.role === 'admin').length;
-  const pendaftarCount = users.filter((user: PublicUser) => user.role === 'pendaftar').length;
+  const isAdmin = user.role === 'ADMIN';
+  const isAdmissionCommittee = user.role === 'ADMISSION_COMMITTEE';
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Section */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Administrator Dashboard</h2>
-            <p className="text-gray-600">
-              Welcome to the admin panel, <span className="font-semibold">{currentUser.username}</span>! 
-              Manage users and monitor system activity.
-            </p>
-          </div>
-          <div className="text-right">
-            <Badge variant="destructive" className="mb-2">
-              <CrownIcon className="h-3 w-3 mr-1" />
-              Administrator
-            </Badge>
-            <p className="text-xs text-gray-500">
-              Member since {formatDate(currentUser.created_at)}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <UsersIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Registered in the system
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Administrators</CardTitle>
-            <CrownIcon className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{adminCount}</div>
-            <p className="text-xs text-muted-foreground">
-              Users with admin privileges
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendaftar</CardTitle>
-            <ClipboardIcon className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendaftarCount}</div>
-            <p className="text-xs text-muted-foreground">
-              Regular user accounts
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* User Management Section */}
-      <Card>
+    <div className="space-y-6">
+      {/* Welcome Header */}
+      <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
-                <UsersIcon className="h-5 w-5" />
-                <span>User Management</span>
-              </CardTitle>
-              <CardDescription>
-                View and manage all registered users in the system
-              </CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="bg-purple-100 p-3 rounded-full">
+                <Settings className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl text-purple-900">
+                  {isAdmin ? 'Admin Dashboard' : 'Admissions Dashboard'}
+                </CardTitle>
+                <CardDescription className="text-purple-700">
+                  Manage applications and oversee the admission process
+                </CardDescription>
+              </div>
             </div>
-            <Button 
+            
+            <Badge 
               variant="outline" 
-              size="sm" 
-              onClick={loadUsers}
-              disabled={isLoading}
-              className="flex items-center space-x-2"
+              className="bg-white/50 border-purple-300 text-purple-800"
             >
-              <RefreshCwIcon className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
-            </Button>
+              {user.role.replace('_', ' ')}
+            </Badge>
           </div>
-          {lastUpdated && (
-            <p className="text-xs text-gray-500 flex items-center mt-2">
-              <CalendarIcon className="h-3 w-3 mr-1" />
-              Last updated: {formatDate(lastUpdated)}
-            </p>
-          )}
         </CardHeader>
-        <CardContent>
-          {/* Demo Alert */}
-          <Alert className="border-amber-200 bg-amber-50 mb-6">
-            <AlertCircleIcon className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-800">
-              <strong>Demo Mode:</strong> The getAllUsers handler returns an empty array. 
-              In a real implementation, this would display all registered users.
-            </AlertDescription>
-          </Alert>
+      </Card>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
+      {/* Quick Stats */}
+      {dashboardStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Total Applications
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-gray-600">Loading users...</span>
+                <FileText className="h-5 w-5 text-blue-600" />
+                <span className="text-3xl font-bold text-blue-600">
+                  {dashboardStats.totalApplications}
+                </span>
               </div>
-            </div>
-          ) : users.length === 0 ? (
-            <div className="text-center py-8">
-              <UsersIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Users Found</h3>
-              <p className="text-gray-500 mb-4">
-                No users have been registered yet, or the backend is returning empty data.
-              </p>
-              <Button variant="outline" onClick={loadUsers}>
-                Try Again
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {users.map((user: PublicUser) => (
-                <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {user.username.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">{user.username}</h4>
-                      <div className="flex items-center space-x-2 text-sm text-gray-500">
-                        <MailIcon className="h-3 w-3" />
-                        <span>{user.email}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'}>
-                      {user.role === 'admin' ? (
-                        <>
-                          <CrownIcon className="h-3 w-3 mr-1" />
-                          Admin
-                        </>
-                      ) : (
-                        <>
-                          <ClipboardIcon className="h-3 w-3 mr-1" />
-                          Pendaftar
-                        </>
-                      )}
-                    </Badge>
-                    <div className="text-right text-xs text-gray-500">
-                      <div>Joined {formatDate(user.created_at)}</div>
-                      {user.updated_at.getTime() !== user.created_at.getTime() && (
-                        <div>Updated {formatDate(user.updated_at)}</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* System Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle>System Information</CardTitle>
-          <CardDescription>Current system status and configuration</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <h4 className="font-medium text-gray-900">User Account Summary</h4>
-              <div className="space-y-1 text-sm text-gray-600">
-                <div className="flex justify-between">
-                  <span>Total Registered Users:</span>
-                  <span className="font-medium">{users.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Administrator Accounts:</span>
-                  <span className="font-medium">{adminCount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Pendaftar Accounts:</span>
-                  <span className="font-medium">{pendaftarCount}</span>
-                </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Pending Review
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-yellow-600" />
+                <span className="text-3xl font-bold text-yellow-600">
+                  {(dashboardStats.applicationsByStatus?.INITIAL_REGISTRATION || 0) + 
+                   (dashboardStats.applicationsByStatus?.DOCUMENT_UPLOAD || 0) + 
+                   (dashboardStats.applicationsByStatus?.SELECTION || 0)}
+                </span>
               </div>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium text-gray-900">Your Account</h4>
-              <div className="space-y-1 text-sm text-gray-600">
-                <div className="flex justify-between">
-                  <span>Account ID:</span>
-                  <span className="font-medium">#{currentUser.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Email:</span>
-                  <span className="font-medium">{currentUser.email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Role:</span>
-                  <Badge variant="destructive" className="ml-2">Administrator</Badge>
-                </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Approved
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-2">
+                <UserCheck className="h-5 w-5 text-green-600" />
+                <span className="text-3xl font-bold text-green-600">
+                  {(dashboardStats.applicationsByStatus?.ANNOUNCEMENT || 0) + 
+                   (dashboardStats.applicationsByStatus?.RE_REGISTRATION || 0)}
+                </span>
               </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Total Applicants
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-2">
+                <Users className="h-5 w-5 text-purple-600" />
+                <span className="text-3xl font-bold text-purple-600">
+                  {dashboardStats.totalApplications}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Main Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="overview" className="flex items-center space-x-2">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="applications" className="flex items-center space-x-2">
+            <FileText className="h-4 w-4" />
+            <span className="hidden sm:inline">Applications</span>
+          </TabsTrigger>
+          <TabsTrigger value="documents" className="flex items-center space-x-2">
+            <Search className="h-4 w-4" />
+            <span className="hidden sm:inline">Documents</span>
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center space-x-2">
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Reports</span>
+          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="users" className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Users</span>
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-6">
+          <AdminStats dashboardStats={dashboardStats} isLoading={isLoading} />
+        </TabsContent>
+
+        <TabsContent value="applications" className="mt-6">
+          <ApplicationsManager user={user} />
+        </TabsContent>
+
+        <TabsContent value="documents" className="mt-6">
+          <DocumentViewer />
+        </TabsContent>
+
+        <TabsContent value="reports" className="mt-6">
+          <ReportsManager />
+        </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="users" className="mt-6">
+            <AdminUserManager />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }

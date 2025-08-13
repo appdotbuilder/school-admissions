@@ -1,11 +1,12 @@
+import { db } from '../db';
+import { applicantProfilesTable } from '../db/schema';
 import { type CreateApplicantProfileInput, type ApplicantProfile } from '../schema';
+import { eq } from 'drizzle-orm';
 
 export const createApplicantProfile = async (userId: number, input: CreateApplicantProfileInput): Promise<ApplicantProfile> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to create an applicant profile linked to a user account
-    // and store personal details, parent information, and school level preference.
-    return Promise.resolve({
-        id: 0,
+  try {
+    const result = await db.insert(applicantProfilesTable)
+      .values({
         user_id: userId,
         date_of_birth: input.date_of_birth,
         address: input.address,
@@ -13,44 +14,74 @@ export const createApplicantProfile = async (userId: number, input: CreateApplic
         parent_full_name: input.parent_full_name,
         parent_phone_number: input.parent_phone_number,
         parent_email: input.parent_email,
-        school_level: input.school_level,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as ApplicantProfile);
+        school_level: input.school_level
+      })
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('Applicant profile creation failed:', error);
+    throw error;
+  }
 };
 
 export const getApplicantProfile = async (userId: number): Promise<ApplicantProfile | null> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch the applicant profile for a specific user.
-    return Promise.resolve({
-        id: 0,
-        user_id: userId,
-        date_of_birth: new Date(),
-        address: 'Placeholder Address',
-        phone_number: '+1234567890',
-        parent_full_name: 'Placeholder Parent',
-        parent_phone_number: '+1234567891',
-        parent_email: 'parent@example.com',
-        school_level: 'JUNIOR_HIGH',
-        created_at: new Date(),
-        updated_at: new Date()
-    } as ApplicantProfile);
+  try {
+    const profiles = await db.select()
+      .from(applicantProfilesTable)
+      .where(eq(applicantProfilesTable.user_id, userId))
+      .execute();
+
+    return profiles.length > 0 ? profiles[0] : null;
+  } catch (error) {
+    console.error('Applicant profile fetch failed:', error);
+    throw error;
+  }
 };
 
 export const updateApplicantProfile = async (userId: number, input: Partial<CreateApplicantProfileInput>): Promise<ApplicantProfile> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to update existing applicant profile information.
-    return Promise.resolve({
-        id: 0,
-        user_id: userId,
-        date_of_birth: input.date_of_birth || new Date(),
-        address: input.address || 'Updated Address',
-        phone_number: input.phone_number || '+1234567890',
-        parent_full_name: input.parent_full_name || 'Updated Parent',
-        parent_phone_number: input.parent_phone_number || '+1234567891',
-        parent_email: input.parent_email || 'parent@example.com',
-        school_level: input.school_level || 'JUNIOR_HIGH',
-        created_at: new Date(),
-        updated_at: new Date()
-    } as ApplicantProfile);
+  try {
+    // Create update object with only defined fields
+    const updateData: Partial<typeof applicantProfilesTable.$inferInsert> = {
+      updated_at: new Date()
+    };
+
+    if (input.date_of_birth !== undefined) {
+      updateData.date_of_birth = input.date_of_birth;
+    }
+    if (input.address !== undefined) {
+      updateData.address = input.address;
+    }
+    if (input.phone_number !== undefined) {
+      updateData.phone_number = input.phone_number;
+    }
+    if (input.parent_full_name !== undefined) {
+      updateData.parent_full_name = input.parent_full_name;
+    }
+    if (input.parent_phone_number !== undefined) {
+      updateData.parent_phone_number = input.parent_phone_number;
+    }
+    if (input.parent_email !== undefined) {
+      updateData.parent_email = input.parent_email;
+    }
+    if (input.school_level !== undefined) {
+      updateData.school_level = input.school_level;
+    }
+
+    const result = await db.update(applicantProfilesTable)
+      .set(updateData)
+      .where(eq(applicantProfilesTable.user_id, userId))
+      .returning()
+      .execute();
+
+    if (result.length === 0) {
+      throw new Error('Applicant profile not found for update');
+    }
+
+    return result[0];
+  } catch (error) {
+    console.error('Applicant profile update failed:', error);
+    throw error;
+  }
 };

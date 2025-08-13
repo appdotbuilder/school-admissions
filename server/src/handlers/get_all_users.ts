@@ -1,11 +1,29 @@
+import { db } from '../db';
+import { usersTable } from '../db/schema';
 import { type PublicUser } from '../schema';
 
-export async function getAllUsers(): Promise<PublicUser[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to:
-    // 1. Fetch all users from the database
-    // 2. Return array of user data (excluding password hashes)
-    // 3. This should typically be restricted to admin users only
-    
-    return Promise.resolve([]);
-}
+export const getAllUsers = async (): Promise<PublicUser[]> => {
+  try {
+    // Fetch all users from database
+    const users = await db.select({
+      id: usersTable.id,
+      username: usersTable.username,
+      email: usersTable.email,
+      role: usersTable.role,
+      created_at: usersTable.created_at,
+      updated_at: usersTable.updated_at
+    })
+    .from(usersTable)
+    .execute();
+
+    // Return users without password hashes
+    return users.map(user => ({
+      ...user,
+      created_at: new Date(user.created_at),
+      updated_at: new Date(user.updated_at)
+    }));
+  } catch (error) {
+    console.error('Get all users failed:', error);
+    throw error;
+  }
+};

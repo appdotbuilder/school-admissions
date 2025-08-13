@@ -1,11 +1,34 @@
+import { db } from '../db';
+import { usersTable } from '../db/schema';
 import { type GetUserByIdInput, type PublicUser } from '../schema';
+import { eq } from 'drizzle-orm';
 
 export async function getUserById(input: GetUserByIdInput): Promise<PublicUser | null> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to:
-    // 1. Find user by ID in the database
-    // 2. Return user data (excluding password hash) if found
-    // 3. Return null if user not found
+  try {
+    // Query user by ID
+    const users = await db.select()
+      .from(usersTable)
+      .where(eq(usersTable.id, input.id))
+      .execute();
+
+    // Return null if user not found
+    if (users.length === 0) {
+      return null;
+    }
+
+    const user = users[0];
     
-    return Promise.resolve(null);
+    // Return public user data (excluding password_hash)
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      created_at: user.created_at,
+      updated_at: user.updated_at
+    };
+  } catch (error) {
+    console.error('Get user by ID failed:', error);
+    throw error;
+  }
 }
